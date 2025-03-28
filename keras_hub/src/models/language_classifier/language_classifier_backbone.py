@@ -16,25 +16,38 @@ class LanguageClassifierBackbone(Backbone):
             vocab_size: int = 30000,
             embedding_dim: int = 256,
             num_languages: int = 10,
+            sequence_length: int = None,  # This parameter is crucial
+            dtype=None,
             **kwargs,
     ):
-        super().__init__(**kwargs)
+        # === Functional Model ===
+        # Create input tensor with FIXED sequence length
+        inputs = keras.layers.Input(shape=(sequence_length,), dtype=tf.int32)
+
+        # Apply layers sequentially
+        x = layers.Embedding(
+            input_dim=vocab_size,
+            output_dim=embedding_dim,
+            dtype=dtype
+        )(inputs)
+
+        x = layers.GlobalAveragePooling1D()(x)
+
+        outputs = layers.Dense(num_languages)(x)
+
+        # Initialize the model with inputs and outputs
+        super().__init__(
+            inputs=inputs,
+            outputs=outputs,
+            dtype=dtype,
+            **kwargs
+        )
+
+        # Store configuration values
         self.vocab_size = vocab_size
         self.embedding_dim = embedding_dim
         self.num_languages = num_languages
-
-        # Simple embedding layer followed by pooling and a linear layer
-        self.embedding = layers.Embedding(
-            input_dim=vocab_size,
-            output_dim=embedding_dim
-        )
-        self.global_pooling = layers.GlobalAveragePooling1D()
-        self.classifier = layers.Dense(num_languages)
-
-    def call(self, inputs):
-        x = self.embedding(inputs)
-        x = self.global_pooling(x)
-        return self.classifier(x)
+        self.sequence_length = sequence_length
 
     def get_config(self):
         config = super().get_config()
@@ -42,9 +55,9 @@ class LanguageClassifierBackbone(Backbone):
             "vocab_size": self.vocab_size,
             "embedding_dim": self.embedding_dim,
             "num_languages": self.num_languages,
+            "sequence_length": self.sequence_length,
         })
         return config
-
 
 class LanguageClassifier(keras.Model):
     """Model for classifying the language of text inputs."""

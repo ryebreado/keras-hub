@@ -11,6 +11,8 @@ from keras_hub.src.models.language_classifier.language_classifier_backbone impor
     LanguageClassifierBackbone
 )
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.preprocessing import LabelEncoder
+
 
 from keras_hub.src.tokenizers.byte_pair_tokenizer import BytePairTokenizer
 
@@ -42,31 +44,30 @@ vocab_size = 1000  # Adjust based on your dataset size
 
 # Check if you need to specify required parameters
 tokenizer = UnicodeCodepointTokenizer()
-
 # Tokenize data
 X_train_tokens = tokenizer(X_train)
-# X_train_tokens = np.array(X_train_tokens, dtype=np.float32)
 X_test_tokens = tokenizer(X_test)
-# X_test_tokens = np.array(X_test_tokens, dtype=np.float32)
 
+# Pad sequences to the same length
+max_length = max(max(len(seq) for seq in X_train_tokens), max(len(seq) for seq in X_test_tokens))
+X_train_padded = pad_sequences(X_train_tokens, maxlen=max_length, padding='post', value=0)
+X_test_padded = pad_sequences(X_test_tokens, maxlen=max_length, padding='post', value=0)
 
-# Find the length of the longest sequence
-max_length = max(len(seq) for seq in X_train_tokens)
+# Convert to numpy arrays of int32 type (for embedding layer)
+X_train_tokens = np.array(X_train_padded, dtype=np.int32)
+X_test_tokens = np.array(X_test_padded, dtype=np.int32)
 
-# Pad all sequences to the same length
-X_train_padded = pad_sequences(X_train_tokens,
-                               maxlen=max_length,
-                               padding='post',  # Add padding at the end
-                               value=0)         # Pad with zeros
-
-# Convert to numpy array
-X_train_tokens = np.array(X_train_padded, dtype=np.float32)
+# Convert labels to numerical values consistently
+label_encoder = LabelEncoder()
+y_train_encoded = label_encoder.fit_transform(y_train)
+y_test_encoded = label_encoder.transform(y_test)
 
 # Create backbone and model
 backbone = LanguageClassifierBackbone(
     vocab_size=tokenizer.vocabulary_size(),
     embedding_dim=128,
     num_languages=len(language_labels),
+    sequence_length=max_length,
 )
 
 model = LanguageClassifier(
@@ -81,20 +82,11 @@ model.compile(
     optimizer="adam",
     metrics=["accuracy"],
 )
-# Assuming your labels are text like "English", "French", etc.
-# First convert to numerical indices
-from sklearn.preprocessing import LabelEncoder
-label_encoder = LabelEncoder()
-y_encoded = label_encoder.fit_transform(y_train)
 
-# For categorical crossentropy loss, one-hot encode:
-y_train = tf.keras.utils.to_categorical(y_encoded)
-
-# Train the model
 model.fit(
     X_train_tokens,
-    np.array(y_train),
+    y_train_encoded,
     epochs=10,
     batch_size=16,
-    validation_data=(X_test_tokens, np.array(y_test))
+    validation_data=(X_test_tokens, y_test_encoded)
 )
