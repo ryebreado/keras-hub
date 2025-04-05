@@ -1,7 +1,6 @@
 import tensorflow as tf
 import keras
 from keras import layers
-# from typing import Any, Dict, Optional, Tuple, Union
 from typing import Union
 
 from keras_hub.src.models.backbone import Backbone
@@ -16,12 +15,12 @@ class LanguageClassifierBackbone(Backbone):
             vocab_size: int = 30000,
             embedding_dim: int = 256,
             num_languages: int = 10,
-            sequence_length: int = None,  # This parameter is crucial
+            sequence_length: int = None,
             dtype=None,
             **kwargs,
     ):
         # === Functional Model ===
-        # Create input tensor with FIXED sequence length
+        # Create input tensor
         inputs = keras.layers.Input(shape=(sequence_length,), dtype=tf.int32)
 
         # Apply layers sequentially
@@ -33,7 +32,7 @@ class LanguageClassifierBackbone(Backbone):
 
         x = layers.GlobalAveragePooling1D()(x)
 
-        outputs = layers.Dense(num_languages)(x)
+        outputs = layers.Dense(num_languages, activation='softmax')(x)
 
         # Initialize the model with inputs and outputs
         super().__init__(
